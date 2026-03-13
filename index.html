@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Wars: Deckbuilder</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --rebel:#E8440A;--rebel-g:rgba(232,68,10,.4);--rebel-dim:rgba(232,68,10,.12);
+  --empire:#4A9EFF;--empire-g:rgba(74,158,255,.4);--empire-dim:rgba(74,158,255,.12);
+  --gold:#F5C842;--gold-dim:rgba(245,200,66,.15);
+  --hit:#ff3d5a;--hit-dim:rgba(255,61,90,.18);
+  --force:#c8a0ff;--force-dim:rgba(200,160,255,.15);
+  --hp-hi:#4ade80;--hp-md:#facc15;--hp-lo:#f87171;
+  --pu-hp:#34d399;--pu-atk:#f97316;--pu-res:#a78bfa;
+  --bg:#040710;--bg2:#0a1020;--bg3:#101828;--bg4:#161f30;
+  --border:rgba(255,255,255,.07);--text:#dde2f0;--muted:#6070a0;
+  --cw:108px;--ch:156px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 40% at 20% 10%,rgba(74,158,255,.06) 0,transparent 100%),
+             radial-gradient(ellipse 70% 40% at 80% 90%,rgba(232,68,10,.06) 0,transparent 100%);}
+canvas#sf{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* ─ LAYOUT ─ */
+#g{position:relative;z-index:1;display:grid;
+  grid-template-rows:auto auto auto auto auto auto auto;
+  gap:5px;padding:6px 8px;max-width:1160px;margin:0 auto;min-height:100vh;}
+
+/* ─ TITLE ─ */
+.tbar{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:5px 14px;background:rgba(10,16,32,.9);border:0.5px solid var(--border);
+  border-radius:8px;backdrop-filter:blur(14px);}
+.tbar h1{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:900;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--empire),var(--force),var(--rebel));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;}
+.tpill{font-size:10px;font-weight:700;letter-spacing:1.5px;padding:3px 11px;border-radius:20px;white-space:nowrap;}
+.tp-p{background:rgba(232,68,10,.2);color:var(--rebel);border:1px solid rgba(232,68,10,.5);}
+.tp-a{background:rgba(74,158,255,.2);color:var(--empire);border:1px solid rgba(74,158,255,.5);}
+.rlbl{font-family:'Orbitron',sans-serif;font-size:10px;color:var(--muted);white-space:nowrap;}
+
+/* ─ BASE ARENA ─ */
+.base-arena{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;
+  padding:8px 10px;border-radius:10px;border:1px solid var(--border);}
+.ba-rebel{background:linear-gradient(135deg,rgba(232,68,10,.06) 0,rgba(10,16,32,.7) 100%);border-color:rgba(232,68,10,.2);}
+.ba-empire{background:linear-gradient(135deg,rgba(74,158,255,.06) 0,rgba(10,16,32,.7) 100%);border-color:rgba(74,158,255,.2);}
+
+/* side info column */
+.side-col{display:flex;flex-direction:column;justify-content:space-between;gap:6px;}
+.side-name{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;}
+.side-score{font-size:10px;color:var(--muted);}
+.side-stats{display:flex;flex-wrap:wrap;gap:4px;}
+.sch{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:600;}
+.sc-cr{background:var(--gold-dim);color:var(--gold);border:1px solid rgba(245,200,66,.3);}
+.sc-fo{background:var(--force-dim);color:var(--force);border:1px solid rgba(200,160,255,.3);}
+.sc-at{background:var(--rebel-dim);color:#ff8866;border:1px solid rgba(232,68,10,.3);}
+.deck-row{font-size:9px;color:var(--muted);}
+.queue-row{display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;}
+.q-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);}
+.q-dot.alive-r{background:rgba(232,68,10,.5);border-color:rgba(232,68,10,.8);}
+.q-dot.alive-e{background:rgba(74,158,255,.5);border-color:rgba(74,158,255,.8);}
+.q-dot.dead{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08);}
+.q-lbl{font-size:9px;color:var(--muted);}
+
+/* active base display */
+.base-display{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:0;}
+.bd-card{border-radius:10px;border:2px solid var(--border);background:var(--bg3);
+  padding:12px 14px;display:flex;flex-direction:column;gap:8px;
+  transition:border-color .2s,box-shadow .2s;position:relative;overflow:hidden;}
+.bd-card.rebel-bd{border-color:rgba(232,68,10,.4);}
+.bd-card.empire-bd{border-color:rgba(74,158,255,.4);}
+.bd-card.targetable{border-color:var(--hit)!important;animation:phit 1.1s ease-in-out infinite;cursor:crosshair;}
+@keyframes phit{0%,100%{box-shadow:0 0 6px rgba(255,61,90,.3);}50%{box-shadow:0 0 18px rgba(255,61,90,.8);}}
+.bd-card.destroyed-bd{filter:grayscale(1);opacity:.3;}
+
+.bd-art{font-size:48px;text-align:center;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6));}
+.bd-name{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;text-align:center;line-height:1.3;}
+.bd-lore{font-size:9px;color:var(--muted);text-align:center;font-style:italic;}
+.bd-hp-wrap{display:flex;flex-direction:column;gap:3px;}
+.bd-hp-nums{display:flex;justify-content:space-between;font-size:10px;}
+.bd-hp-label{color:var(--muted);}
+.bd-hp-val{font-weight:700;}
+.bd-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+.bd-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
+.hhi{background:var(--hp-hi);}
+.hmd{background:var(--hp-md);}
+.hlo{background:var(--hp-lo);}
+
+/* powerups on base */
+.bd-powerups{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+.pu-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.5px;}
+.pu-hp-t{background:rgba(52,211,153,.18);color:var(--pu-hp);border:1px solid rgba(52,211,153,.4);}
+.pu-atk-t{background:rgba(249,115,22,.18);color:var(--pu-atk);border:1px solid rgba(249,115,22,.4);}
+.pu-res-t{background:rgba(167,139,250,.18);color:var(--pu-res);border:1px solid rgba(167,139,250,.4);}
+
+/* base nav */
+.bd-nav{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:3px;}
+.bd-nav-lbl{font-size:9px;color:var(--muted);}
+
+/* vs divider */
+.vs-col{display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.vs-inner{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.vs-text{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:var(--muted);letter-spacing:2px;}
+.force-vert{display:flex;flex-direction:column;gap:3px;align-items:center;}
+.fv-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;}
+.fv-cells{display:flex;flex-direction:column;gap:2px;}
+.fvc{width:14px;height:12px;border-radius:2px;border:1px solid rgba(255,255,255,.07);transition:all .3s;}
+.fvc.rz{background:rgba(232,68,10,.1);}
+.fvc.cz{background:rgba(255,255,255,.04);}
+.fvc.ez{background:rgba(74,158,255,.1);}
+.fvc.tok{background:var(--force)!important;box-shadow:0 0 8px var(--force);border-color:var(--force)!important;}
+.btn.b-force.ready{animation:fpulse 1.4s ease-in-out infinite;border-color:rgba(200,160,255,.7);}
+@keyframes fpulse{0%,100%{box-shadow:0 0 4px rgba(200,160,255,.2);}50%{box-shadow:0 0 14px rgba(200,160,255,.7);}}
+
+/* ─ SECTION LABELS ─ */
+.slbl{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2.5px;color:var(--muted);margin-bottom:5px;}
+
+/* ─ GALAXY ROW ─ */
+.galaxy-wrap{background:rgba(10,16,32,.8);border:0.5px solid var(--border);border-radius:9px;padding:6px 10px;}
+.galaxy-row{display:flex;gap:6px;flex-wrap:wrap;}
+
+/* ─ POWERUP ROW ─ */
+.powerup-wrap{background:rgba(10,16,32,.8);border:0.5px solid rgba(167,139,250,.2);border-radius:9px;padding:6px 10px;}
+.powerup-row{display:flex;gap:6px;flex-wrap:wrap;}
+
+/* ─ HAND ─ */
+.hand-wrap{background:rgba(10,16,32,.8);border:0.5px solid var(--border);border-radius:9px;padding:6px 10px;transition:border-color .3s,box-shadow .3s;}
+.hand-wrap.ai-active{border-color:rgba(74,158,255,.45);box-shadow:0 0 16px rgba(74,158,255,.12);}
+.hand-row{display:flex;gap:6px;flex-wrap:wrap;min-height:var(--ch);align-items:flex-start;padding-top:2px;}
+.card.ai-played{opacity:1;cursor:default;}
+.card.ai-played:hover{transform:none;}
+.card.ai-played-hit{border-color:var(--hit)!important;box-shadow:0 0 10px rgba(255,61,90,.5);}
+@keyframes deal-in{from{opacity:0;transform:translateY(-18px) scale(.92);}to{opacity:1;transform:none;}}
+.card.dealing{animation:deal-in .35s ease-out forwards;}
+
+/* ─ ACTION BAR ─ */
+.abar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 10px;
+  background:rgba(10,16,32,.9);border:0.5px solid var(--border);border-radius:8px;}
+.btn{font-family:'Exo 2',sans-serif;font-size:11px;font-weight:600;letter-spacing:.5px;
+  padding:6px 14px;border-radius:6px;border:1px solid;cursor:pointer;transition:all .14s;white-space:nowrap;}
+.btn:disabled{opacity:.28;cursor:not-allowed;}
+.b-end{background:rgba(232,68,10,.12);color:var(--rebel);border-color:rgba(232,68,10,.45);}
+.b-end:hover:not(:disabled){background:rgba(232,68,10,.28);box-shadow:0 0 10px var(--rebel-g);}
+.b-force{background:rgba(200,160,255,.1);color:var(--force);border-color:rgba(200,160,255,.35);}
+.b-force:hover:not(:disabled){background:rgba(200,160,255,.22);}
+.b-ghost{background:transparent;color:var(--muted);border-color:var(--border);}
+.b-ghost:hover:not(:disabled){background:rgba(255,255,255,.05);color:var(--text);}
+.b-cancel{background:rgba(255,61,90,.1);color:var(--hit);border-color:rgba(255,61,90,.4);}
+.msgbox{flex:1;font-size:11px;color:var(--muted);font-style:italic;min-width:100px;}
+
+/* ─ LOG ─ */
+.logwrap{max-height:68px;overflow-y:auto;padding:4px 10px;background:rgba(0,0,0,.35);border-radius:6px;scrollbar-width:thin;}
+.le{font-size:10px;color:var(--muted);padding:1px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.le:last-child{border:none;}
+.le.hl{color:var(--text);font-weight:500;}
+.le.rl{color:#ff9977;}.le.el{color:#88bbff;}.le.fl{color:var(--force);}
+.le.hil{color:var(--hit);}.le.pul{color:var(--pu-hp);}
+.vc-btn{transition:transform .14s,box-shadow .14s,border-color .14s!important;}
+.vc-btn:hover{border-color:var(--gold)!important;background:rgba(245,200,66,.08)!important;transform:translateY(-2px);box-shadow:0 4px 14px rgba(245,200,66,.25);}
+
+/* ─ CARDS ─ */
+.card{width:var(--cw);height:var(--ch);border-radius:7px;border:1px solid var(--border);
+  background:var(--bg3);cursor:pointer;
+  transition:transform .14s,box-shadow .14s,border-color .14s;
+  display:flex;flex-direction:column;padding:6px;flex-shrink:0;user-select:none;position:relative;}
+.card:hover{transform:translateY(-7px);}
+.card.rebel-card{border-color:rgba(232,68,10,.3);}
+.card.rebel-card:hover{border-color:var(--rebel);box-shadow:0 8px 20px var(--rebel-g);}
+.card.empire-card{border-color:rgba(74,158,255,.3);}
+.card.empire-card:hover{border-color:var(--empire);box-shadow:0 8px 20px var(--empire-g);}
+.card.neutral-card:hover{border-color:var(--gold);box-shadow:0 8px 20px rgba(245,200,66,.25);}
+.card.playable{border-color:rgba(255,255,255,.3);}
+.card.playable:hover{border-color:#fff;box-shadow:0 0 14px rgba(255,255,255,.18);}
+.card.has-hit{border-color:rgba(255,61,90,.45);}
+.card.has-hit:hover{border-color:var(--hit);box-shadow:0 8px 20px rgba(255,61,90,.4);}
+.card.played{opacity:.42;transform:none!important;cursor:default;}
+.card.buyable{border-color:var(--gold);animation:pg 1.5s ease-in-out infinite;}
+@keyframes pg{0%,100%{box-shadow:0 0 5px rgba(245,200,66,.25);}50%{box-shadow:0 0 14px rgba(245,200,66,.65);}}
+.card.pu-card{border-color:rgba(167,139,250,.5);animation:pup 1.8s ease-in-out infinite;}
+@keyframes pup{0%,100%{box-shadow:0 0 5px rgba(167,139,250,.2);}50%{box-shadow:0 0 14px rgba(167,139,250,.6);}}
+.card.back-card{cursor:default;
+  background:repeating-linear-gradient(45deg,rgba(74,158,255,.05) 0,rgba(74,158,255,.05) 4px,transparent 4px,transparent 8px);
+  border-color:rgba(74,158,255,.15);}
+.card.back-card:hover{transform:none;}
+.ctop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;}
+.fdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:1px;}
+.cbadge{width:18px;height:18px;border-radius:50%;background:rgba(245,200,66,.18);
+  border:1px solid var(--gold);color:var(--gold);font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cname{font-size:10px;font-weight:600;line-height:1.3;min-height:24px;}
+.ctype{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.cart{flex:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:3px;}
+.cicons{display:flex;gap:2px;flex-wrap:wrap;}
+.ic{font-size:8px;padding:1px 4px;border-radius:3px;font-weight:700;}
+.ic-cr{background:rgba(245,200,66,.18);color:var(--gold);}
+.ic-fo{background:rgba(200,160,255,.18);color:var(--force);}
+.ic-at{background:rgba(232,68,10,.18);color:#ff8866;}
+.ic-hit{background:rgba(255,61,90,.22);color:var(--hit);}
+.ic-sp{background:rgba(80,220,140,.18);color:#4ade80;}
+.ic-pu{background:rgba(167,139,250,.22);color:var(--pu-res);}
+
+/* powerup cards have a special header stripe */
+.pu-stripe{position:absolute;top:0;left:0;right:0;height:3px;border-radius:7px 7px 0 0;}
+.pu-hp-s{background:var(--pu-hp);}
+.pu-atk-s{background:var(--pu-atk);}
+.pu-res-s{background:var(--pu-res);}
+
+/* ─ OVERLAY ─ */
+.ov{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.88);backdrop-filter:blur(8px);}
+.ovbox{background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:2rem;text-align:center;max-width:500px;width:90%;}
+.ovbox h2{font-family:'Orbitron',sans-serif;font-size:20px;margin-bottom:.8rem;}
+.ovbox p{color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:.75rem;}
+.wr{color:var(--rebel);text-shadow:0 0 24px var(--rebel);}
+.we{color:var(--empire);text-shadow:0 0 24px var(--empire);}
+</style>
+</head>
+<body>
+<canvas id="sf"></canvas>
+<div id="g">
+
+  <!-- TITLE -->
+  <div class="tbar">
+    <h1>STAR WARS: DECKBUILDER</h1>
+    <div id="tpill" class="tpill tp-p">YOUR TURN</div>
+    <div class="rlbl">ROUND <span id="rnum">1</span> &nbsp;|&nbsp; <span id="win-goal-lbl">DESTROY 3 ENEMY BASES TO WIN</span></div>
+  </div>
+
+  <!-- EMPIRE BASE (top) -->
+  <div class="base-arena ba-empire" id="empire-arena">
+    <!-- filled by renderArena('empire') -->
+  </div>
+
+  <!-- AI HAND -->
+  <div class="hand-wrap" id="ai-hand-wrap">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
+      <div class="slbl" style="margin-bottom:0;" id="ai-hand-lbl">EMPIRE HAND</div>
+      <div id="ai-phase-badge" style="display:none;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:1px;background:rgba(74,158,255,.18);color:var(--empire);border:1px solid rgba(74,158,255,.4);"></div>
+    </div>
+    <div class="hand-row" id="ai-hand"></div>
+  </div>
+
+  <!-- GALAXY ROW -->
+  <div class="galaxy-wrap">
+    <div class="slbl">⬡ GALAXY ROW — SPEND CREDITS TO BUY · HIT CARDS TARGET A SPECIFIC BASE</div>
+    <div class="galaxy-row" id="galaxy-row"></div>
+  </div>
+
+  <!-- POWERUP ROW -->
+  <div class="powerup-wrap">
+    <div class="slbl" style="color:var(--pu-res);">✦ BASE POWERUPS — BUY WITH CREDITS TO UPGRADE YOUR ACTIVE BASE</div>
+    <div class="powerup-row" id="powerup-row"></div>
+  </div>
+
+  <!-- PLAYER HAND -->
+  <div class="hand-wrap">
+    <div class="slbl">YOUR HAND — CLICK TO PLAY · <span style="color:var(--hit)">HIT CARDS TARGET THE ACTIVE EMPIRE BASE</span></div>
+    <div class="hand-row" id="p-hand"></div>
+  </div>
+
+  <!-- REBEL BASE (bottom) -->
+  <div class="base-arena ba-rebel" id="rebel-arena">
+    <!-- filled by renderArena('rebel') -->
+  </div>
+
+  <!-- ACTION BAR -->
+  <div class="abar">
+    <button class="btn b-force" id="btn-force" onclick="doForce()" disabled>⚡ Force Struggle <span id="force-counts" style="opacity:.7;font-size:10px;"></span></button>
+    <button class="btn b-end"   id="btn-end"   onclick="endTurn()">End Turn →</button>
+    <button class="btn b-cancel" id="btn-cancel" onclick="cancelHit()" style="display:none;">✕ Cancel Hit</button>
+    <div class="msgbox" id="msgbox">Draw cards and play them to generate resources.</div>
+    <button class="btn b-ghost" onclick="showRules()">Rules</button>
+    <button class="btn b-ghost" onclick="showStartScreen()">New Game</button>
+  </div>
+
+  <div class="logwrap" id="logwrap"></div>
+</div>
+<div id="ov" class="ov" style="display:none;"></div>
+
+<script>
+/* ══ STARFIELD ══ */
+(()=>{
+  const c=document.getElementById('sf'),ctx=c.getContext('2d');let st=[];
+  const rz=()=>{c.width=innerWidth;c.height=innerHeight;};
+  const init=()=>{rz();st=Array.from({length:220},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.2+.2,o:Math.random()*.7+.1,d:(Math.random()-.5)*.014}));};
+  const draw=()=>{ctx.clearRect(0,0,c.width,c.height);st.forEach(s=>{s.o=Math.max(.05,Math.min(.85,s.o+s.d));if(Math.random()<.01)s.d*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(255,255,255,${s.o.toFixed(2)})`;ctx.fill();});requestAnimationFrame(draw);};
+  addEventListener('resize',rz);init();draw();
+})();
+
+/* ══ BASE DEFINITIONS ══ */
+const REBEL_BASES=[
+  {id:'rb1',name:'Echo Base',       art:'🏔️',defense:16,lore:'Hoth command center'},
+  {id:'rb2',name:'Yavin IV HQ',     art:'🌿',defense:14,lore:'Original Rebel base'},
+  {id:'rb3',name:'Home One',        art:'🚀',defense:15,lore:'Mon Calamari flagship'},
+  {id:'rb4',name:'Massassi Temple', art:'🏛️',defense:12,lore:'Hidden jungle fortress'},
+  {id:'rb5',name:'Dantooine Outpost',art:'🌾',defense:10,lore:'Remote listening post'},
+  {id:'rb6',name:'Atollon Base',    art:'🏜️',defense:11,lore:'Chopper Base, secret'},
+  {id:'rb7',name:'Mako-Ta Station', art:'🛸',defense:13,lore:'Fleet staging area'},
+  {id:'rb8',name:'Ord Mantell',     art:'⛰️',defense:9, lore:'Smuggler haven'},
+  {id:'rb9',name:'Tierfon Outpost', art:'🌙',defense:8, lore:'Forward fighter base'},
+  {id:'rb10',name:'Zastiga Base',   art:'🌊',defense:10,lore:'Allied council site'},
+];
+const EMPIRE_BASES=[
+  {id:'eb1',name:'Death Star II',    art:'⚫',defense:16,lore:'Superlaser battlestation'},
+  {id:'eb2',name:'Executor Bridge',  art:'🔺',defense:15,lore:"Vader's Super Star Destroyer"},
+  {id:'eb3',name:'Imperial Palace',  art:'🏯',defense:14,lore:'Coruscant throne of power'},
+  {id:'eb4',name:'Maw Installation', art:'🌌',defense:13,lore:'Secret weapons lab'},
+  {id:'eb5',name:'Fondor Shipyard',  art:'🔧',defense:12,lore:'Star Destroyer factory'},
+  {id:'eb6',name:'Byss Fortress',    art:'💀',defense:11,lore:"Emperor's clone facility"},
+  {id:'eb7',name:'Scarif Citadel',   art:'🏖️',defense:10,lore:'Data vault command post'},
+  {id:'eb8',name:'Lothal Base',      art:'🌲',defense:9, lore:'Outer Rim garrison'},
+  {id:'eb9',name:'Mimban Outpost',   art:'🌧️',defense:8, lore:'Muddy conquest depot'},
+  {id:'eb10',name:'Kessel Mines',    art:'⛏️',defense:10,lore:'Spice labor camp'},
+];
+
+/* ══ POWERUP DEFINITIONS ══ */
+// type: 'hp' | 'atk' | 'res'
+// hp → increase current base max HP by amount
+// atk → all attack cards played get +bonus while base is active
+// res → passive +amount credits per turn (capped at 4 total)
+const POWERUP_DB=[
+  {id:'pu1', name:'Shield Generator',  type:'hp',  amount:4, cost:4, art:'🛡️', desc:'+4 max HP to active base'},
+  {id:'pu2', name:'Deflector Array',   type:'hp',  amount:6, cost:5, art:'🔮', desc:'+6 max HP to active base'},
+  {id:'pu3', name:'Reinforced Hull',   type:'hp',  amount:3, cost:3, art:'🪨', desc:'+3 max HP to active base'},
+  {id:'pu4', name:'Turbolaser Battery',type:'atk', amount:2, cost:4, art:'🔫', desc:'+2 to all attack cards this turn'},
+  {id:'pu5', name:'Ion Cannon Array',  type:'atk', amount:3, cost:5, art:'⚡', desc:'+3 to all attack cards this turn'},
+  {id:'pu6', name:'Defense Cannons',   type:'atk', amount:1, cost:3, art:'🎯', desc:'+1 to all attack cards this turn'},
+  {id:'pu7', name:'Resource Cache',    type:'res', amount:1, cost:3, art:'📦', desc:'+1 Credit each turn (max 4 total)'},
+  {id:'pu8', name:'Supply Depot',      type:'res', amount:2, cost:5, art:'🏗️', desc:'+2 Credits each turn (max 4 total)'},
+  {id:'pu9', name:'Mining Operation',  type:'res', amount:1, cost:2, art:'⛏️', desc:'+1 Credit each turn (max 4 total)'},
+  {id:'pu10',name:'Spice Trade Route', type:'res', amount:2, cost:4, art:'💰', desc:'+2 Credits each turn (max 4 total)'},
+];
+
+/* ══ CARD DATABASE ══ */
+const CARD_DB=[
+  {id:'s1',name:'Rebel Fighter',  faction:'rebel', type:'Unit',         cost:0,cr:1,fo:0,at:0,hit:0,sp:'',        art:'🚀',starter:true},
+  {id:'s2',name:'Imperial Scout', faction:'empire',type:'Unit',         cost:0,cr:1,fo:0,at:0,hit:0,sp:'',        art:'🛸',starter:true},
+  {id:'r1',name:'Luke Skywalker', faction:'rebel', type:'Ally',         cost:6,cr:0,fo:3,at:2,hit:5,sp:'forcewin',art:'⚔️'},
+  {id:'r2',name:'Han Solo',       faction:'rebel', type:'Ally',         cost:5,cr:2,fo:0,at:2,hit:3,sp:'draw1',   art:'🔫'},
+  {id:'r3',name:'Princess Leia',  faction:'rebel', type:'Ally',         cost:4,cr:3,fo:1,at:0,hit:0,sp:'',        art:'👑'},
+  {id:'r4',name:'Rebel Trooper',  faction:'rebel', type:'Unit',         cost:2,cr:0,fo:0,at:2,hit:2,sp:'',        art:'🪖'},
+  {id:'r5',name:'X-Wing',         faction:'rebel', type:'Ship',         cost:4,cr:0,fo:1,at:3,hit:4,sp:'',        art:'✈️'},
+  {id:'r6',name:'Millennium Falcon',faction:'rebel',type:'Ship',        cost:7,cr:2,fo:0,at:4,hit:6,sp:'draw1',   art:'🌙'},
+  {id:'r7',name:'Obi-Wan Kenobi', faction:'rebel', type:'Ally',         cost:5,cr:0,fo:4,at:1,hit:3,sp:'',        art:'🧙'},
+  {id:'r8',name:'Y-Wing',         faction:'rebel', type:'Ship',         cost:3,cr:1,fo:0,at:2,hit:3,sp:'',        art:'💫'},
+  {id:'r9',name:'Mon Mothma',     faction:'rebel', type:'Ally',         cost:4,cr:2,fo:2,at:0,hit:0,sp:'',        art:'📜'},
+  {id:'r10',name:'Proton Torpedo',faction:'rebel', type:'Weapon',       cost:3,cr:0,fo:0,at:0,hit:5,sp:'',        art:'💥'},
+  {id:'r11',name:'A-Wing',        faction:'rebel', type:'Ship',         cost:4,cr:1,fo:0,at:2,hit:4,sp:'',        art:'🛩️'},
+  {id:'r12',name:'Admiral Ackbar',faction:'rebel', type:'Ally',         cost:5,cr:0,fo:1,at:3,hit:4,sp:'draw1',   art:'🐟'},
+  {id:'e1',name:'Darth Vader',    faction:'empire',type:'Ally',         cost:7,cr:0,fo:2,at:5,hit:6,sp:'steal2',  art:'🔴'},
+  {id:'e2',name:'Emperor Palpatine',faction:'empire',type:'Ally',       cost:6,cr:0,fo:4,at:2,hit:5,sp:'',        art:'⚡'},
+  {id:'e3',name:'Stormtrooper',   faction:'empire',type:'Unit',         cost:2,cr:0,fo:0,at:2,hit:2,sp:'',        art:'🤖'},
+  {id:'e4',name:'TIE Fighter',    faction:'empire',type:'Ship',         cost:3,cr:1,fo:0,at:2,hit:3,sp:'',        art:'⬛'},
+  {id:'e5',name:'Star Destroyer', faction:'empire',type:'Ship',         cost:6,cr:0,fo:1,at:5,hit:6,sp:'',        art:'🔺'},
+  {id:'e6',name:'Grand Moff Tarkin',faction:'empire',type:'Ally',       cost:5,cr:2,fo:1,at:2,hit:4,sp:'',        art:'🎩'},
+  {id:'e7',name:'Death Star Laser',faction:'empire',type:'Weapon',      cost:8,cr:0,fo:0,at:0,hit:10,sp:'',       art:'⚫'},
+  {id:'e8',name:'Imperial Guard', faction:'empire',type:'Unit',         cost:3,cr:0,fo:0,at:3,hit:3,sp:'',        art:'🛡️'},
+  {id:'e9',name:'AT-AT Walker',   faction:'empire',type:'Unit',         cost:5,cr:0,fo:0,at:4,hit:5,sp:'',        art:'🐘'},
+  {id:'e10',name:'Imperial Spy',  faction:'empire',type:'Unit',         cost:2,cr:1,fo:0,at:1,hit:0,sp:'discard1',art:'🕵️'},
+  {id:'e11',name:'TIE Interceptor',faction:'empire',type:'Ship',        cost:4,cr:0,fo:0,at:3,hit:4,sp:'',        art:'✴️'},
+  {id:'e12',name:'Grand Admiral Thrawn',faction:'empire',type:'Ally',   cost:6,cr:0,fo:2,at:4,hit:5,sp:'draw1',   art:'🎭'},
+  {id:'n1',name:'Boba Fett',      faction:'neutral',type:'Bounty Hunter',cost:5,cr:0,fo:0,at:4,hit:5,sp:'',       art:'🎯'},
+  {id:'n2',name:'Jabba the Hutt', faction:'neutral',type:'Ally',        cost:4,cr:3,fo:0,at:1,hit:0,sp:'',        art:'👾'},
+  {id:'n3',name:'Force Vision',   faction:'neutral',type:'Event',       cost:3,cr:0,fo:3,at:0,hit:0,sp:'',        art:'🔮'},
+  {id:'n4',name:'Lightsaber Duel',faction:'neutral',type:'Event',       cost:4,cr:0,fo:2,at:3,hit:4,sp:'',        art:'⚔️'},
+  {id:'n5',name:'Hyperdrive',     faction:'neutral',type:'Equipment',   cost:2,cr:2,fo:0,at:1,hit:0,sp:'',        art:'🌀'},
+  {id:'n6',name:'Cantina Crew',   faction:'neutral',type:'Ally',        cost:3,cr:3,fo:0,at:0,hit:0,sp:'',        art:'🍺'},
+  {id:'n7',name:'Jawa Scavenger', faction:'neutral',type:'Unit',        cost:1,cr:1,fo:0,at:0,hit:0,sp:'draw1',   art:'🤏'},
+  {id:'n8',name:'Force Crystal',  faction:'neutral',type:'Equipment',   cost:4,cr:0,fo:4,at:0,hit:3,sp:'',        art:'💎'},
+  {id:'n9',name:'IG-88',          faction:'neutral',type:'Bounty Hunter',cost:4,cr:0,fo:0,at:4,hit:4,sp:'',       art:'🤖'},
+  {id:'n10',name:'Mandalorian',   faction:'neutral',type:'Bounty Hunter',cost:5,cr:0,fo:0,at:3,hit:5,sp:'',       art:'🪖'},
+  {id:'n11',name:'Ion Cannon',    faction:'neutral',type:'Weapon',      cost:4,cr:0,fo:0,at:2,hit:6,sp:'',        art:'🔋'},
+];
+
+/* house rules */
+const HR={atkBonus:true,factionBuy:true,factionTax:false};
+
+// Calculate the actual cost a buyer pays for a card
+function effectiveCost(card, buyerFaction){
+  let cost=card.cost;
+  if(card.faction==='neutral') return cost; // neutral cards never discounted or taxed
+  if(HR.factionBuy && card.faction===buyerFaction) cost=Math.max(0,cost-1);
+  if(HR.factionTax && card.faction!==buyerFaction) cost=cost+1;
+  return cost;
+}
+
+/* ══ STATE ══ */
+let G={};
+let pendingHit=null; // {card}
+
+const uid=()=>Math.random().toString(36).slice(2);
+const shuffle=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
+const randi=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+
+function makeBases(defs){
+  // shuffle order — each game different presentation
+  return shuffle(defs).map(d=>({
+    ...d, hp:d.defense, maxHp:d.defense, destroyed:false,
+    powerups:[], // applied powerups: [{type,amount,name}]
+    atkBonus:0,  // accumulated attack bonus from 'atk' type powerups this turn
+  }));
+}
+function makeStarterDeck(faction){
+  const t=CARD_DB.find(c=>c.starter&&c.faction===faction);
+  return shuffle(Array.from({length:10},()=>({...t,uid:uid()})));
+}
+
+function newGame(){
+  hideOv(); cancelHit();
+  const galPool=CARD_DB.filter(c=>!c.starter);
+  const galDeck=shuffle([...galPool,...galPool]);
+  // Build powerup row — pick 4 random each game, refresh every 3 rounds
+  const puDeck=shuffle([...POWERUP_DB,...POWERUP_DB]);
+
+  G={
+    round:1, turn:'player', forcePlayed:false,
+    forcePos:4, forceTotal:9,
+    galaxy:{deck:galDeck,row:[]},
+    pu:{deck:puDeck,row:[]},
+    player:{
+      faction:'rebel',
+      bases:makeBases(REBEL_BASES),
+      activeBaseIdx:0,
+      deck:makeStarterDeck('rebel'),
+      hand:[],discard:[],played:[],
+      credits:0,force:0,attack:0,atkCards:0,
+      passiveCredits:0,
+    },
+    ai:{
+      faction:'empire',
+      bases:makeBases(EMPIRE_BASES),
+      activeBaseIdx:0,
+      deck:makeStarterDeck('empire'),
+      hand:[],discard:[],played:[],
+      credits:0,force:0,attack:0,atkCards:0,
+      passiveCredits:0,
+    },
+    log:[],
+    gameOver:false,
+    aiFirstTurn:true,
+  };
+  for(let i=0;i<6;i++) drawGalaxy();
+  for(let i=0;i<4;i++) drawPowerup();
+  drawCards(G.player,5); // Rebels go first, draw 5
+  // AI draws 6 at the start of its first turn
+  setButtons(true);
+  render();
+  addLog('New game! Rebel Alliance goes first (5 card draw). Empire draws 6 on their turn.','hl');
+  setMsg('Play cards · Buy from Galaxy Row · Upgrade your base with Powerups · End Turn');
+}
+
+function drawCards(who,n){
+  for(let i=0;i<n;i++){
+    if(who.deck.length===0){if(who.discard.length===0)break;who.deck=shuffle(who.discard);who.discard=[];}
+    if(who.deck.length>0)who.hand.push(who.deck.pop());
+  }
+}
+function drawGalaxy(){if(G.galaxy.deck.length>0)G.galaxy.row.push({...G.galaxy.deck.pop(),uid:uid()});}
+function drawPowerup(){if(G.pu.deck.length>0)G.pu.row.push({...G.pu.deck.pop(),uid:uid()});}
+
+/* ── active base helpers ── */
+function activeBase(who){
+  const alive=who.bases.filter(b=>!b.destroyed);
+  if(!alive.length) return null;
+  // activeBaseIdx cycles through alive ones
+  const idx=who.activeBaseIdx%alive.length;
+  return alive[idx];
+}
+function advanceBase(who){
+  const alive=who.bases.filter(b=>!b.destroyed);
+  if(!alive.length) return;
+  who.activeBaseIdx=(who.activeBaseIdx+1)%alive.length;
+}
+
+/* ── passive credits ── */
+function getPassiveCredits(who){
+  return Math.min(4, who.passiveCredits);
+}
+
+/* ══ PLAYER ACTIONS ══ */
+function playCard(cardUid){
+  if(G.turn!=='player'||G.gameOver) return;
+  const idx=G.player.hand.findIndex(c=>c.uid===cardUid);
+  if(idx===-1)return;
+  const card=G.player.hand.splice(idx,1)[0];
+  G.player.played.push(card);
+
+  // Apply active base atk bonus from powerups
+  const ab=activeBase(G.player);
+  const atkBonus=ab?ab.atkBonus:0;
+
+  G.player.credits+=card.cr;
+  G.player.force+=card.fo;
+  // Hit cards deal damage directly — don't also pool their attack for bombardment
+  const rawAtk = card.hit>0 ? 0 : card.at+(card.at>0?atkBonus:0);
+  G.player.attack+=rawAtk;
+  if(rawAtk>0)G.player.atkCards++;
+
+  if(HR.atkBonus&&G.player.atkCards===2){G.player.attack+=2;addLog('House rule: Double Attack! +2⚔','rl');}
+
+  if(card.sp==='draw1')drawCards(G.player,1);
+  if(card.sp==='forcewin'&&G.forcePos<=2){G.player.attack+=2;addLog("Luke's Force advantage: +2⚔!",'rl');}
+
+  const log=`Played ${card.name}`;
+  const parts=[];
+  if(card.cr>0)parts.push(`+${card.cr}₿`);
+  if(card.fo>0)parts.push(`+${card.fo}⚡`);
+  if(rawAtk>0)parts.push(`+${rawAtk}⚔`+(atkBonus>0?` (incl. +${atkBonus} base bonus)`:'')); 
+  if(card.hit>0)parts.push(`HIT:${card.hit}`);
+  addLog(`${log} [${parts.join(' ')}]`,'rl');
+
+  if(card.hit>0){
+    const ab=activeBase(G.ai);
+    pendingHit={card};
+    setMsg(`${card.name} deals ${card.hit} direct damage — click the active Empire base (${ab?ab.name:'...'}) to target it.`);
+    document.getElementById('btn-cancel').style.display='inline-block';
+    render();return;
+  }
+  render();updateStats();
+}
+
+function buyCard(cardUid){
+  if(G.turn!=='player'||G.gameOver||pendingHit)return;
+  const idx=G.galaxy.row.findIndex(c=>c.uid===cardUid);
+  if(idx===-1)return;
+  const card=G.galaxy.row[idx];
+  let cost=effectiveCost(card,'rebel');
+  if(G.player.credits<cost){setMsg(`Need ${cost}₿, you have ${G.player.credits}₿.`);return;}
+  G.player.credits-=cost;
+  G.galaxy.row.splice(idx,1);
+  G.player.discard.push({...card,uid:uid()});
+  drawGalaxy();
+  addLog(`Purchased ${card.name} (${cost}₿)`,'rl');
+  render();updateStats();
+}
+
+function buyPowerup(puUid){
+  if(G.turn!=='player'||G.gameOver||pendingHit)return;
+  const idx=G.pu.row.findIndex(p=>p.uid===puUid);
+  if(idx===-1)return;
+  const pu=G.pu.row[idx];
+  if(G.player.credits<pu.cost){setMsg(`Need ${pu.cost}₿ for this powerup. Have ${G.player.credits}₿.`);return;}
+
+  const ab=activeBase(G.player);
+  if(!ab){setMsg('No active base to upgrade!');return;}
+
+  G.player.credits-=pu.cost;
+  G.pu.row.splice(idx,1);
+  drawPowerup();
+
+  // Apply powerup effect to active base
+  if(pu.type==='hp'){
+    ab.hp+=pu.amount;
+    ab.maxHp+=pu.amount;
+    ab.powerups.push({type:'hp',amount:pu.amount,name:pu.name});
+    addLog(`✦ ${pu.name} applied to ${ab.name}: +${pu.amount} max HP (now ${ab.maxHp} HP)`,'pul');
+  } else if(pu.type==='atk'){
+    ab.atkBonus=Math.min(ab.atkBonus+pu.amount, 8);
+    ab.powerups.push({type:'atk',amount:pu.amount,name:pu.name});
+    addLog(`✦ ${pu.name} applied to ${ab.name}: +${pu.amount} attack bonus per card`,'pul');
+  } else if(pu.type==='res'){
+    const cur=G.player.passiveCredits;
+    const add=Math.min(pu.amount, 4-cur);
+    G.player.passiveCredits=Math.min(4, cur+add);
+    ab.powerups.push({type:'res',amount:add,name:pu.name});
+    addLog(`✦ ${pu.name}: passive +${add}₿/turn (total passive: ${G.player.passiveCredits}₿)`,'pul');
+  }
+  render();updateStats();
+}
+
+function targetBase(baseId){
+  if(!pendingHit)return;
+  const ab=activeBase(G.ai);
+  // Only the active base can be targeted
+  if(!ab||ab.id!==baseId){
+    setMsg('You can only target the active Empire base!');
+    return;
+  }
+  const dmg=pendingHit.card.hit;
+  ab.hp=Math.max(0,ab.hp-dmg);
+  if(ab.hp===0&&!ab.destroyed){
+    ab.destroyed=true;
+    addLog(`💥 ${ab.name} DESTROYED by ${pendingHit.card.name}!`,'hil');
+    checkWin();
+  } else {
+    addLog(`🎯 ${pendingHit.card.name} → ${ab.name} for ${dmg} dmg (${ab.hp}/${ab.maxHp} HP)`,'hil');
+  }
+  cancelHit();
+  render();updateStats();
+  // Do NOT continue if game ended from this hit
+}
+
+function cancelHit(){
+  pendingHit=null;
+  document.getElementById('btn-cancel').style.display='none';
+  if(!G.gameOver) setMsg('Play cards · Buy from Galaxy Row · Upgrade base with Powerups · End Turn');
+}
+
+// Force track zones (positions 0–8):
+// 0–1 = Deep Rebel  → player: draw +1 card next turn, AI: -1 attack
+// 2–3 = Rebel       → player: +2 bonus credits next turn
+// 4   = Neutral     → no effect
+// 5–6 = Empire      → AI: +2 bonus credits next turn
+// 7–8 = Deep Empire → AI: +2 attack this bombardment, player: -1 card draw next turn
+function getForceEffect(pos){
+  if(pos<=1) return {zone:'DEEP REBEL',rebel:'+1 card draw · AI −1 attack',empire:null,rebelBonus:{draw:1,atkPenalty:1},empireBonus:{}};
+  if(pos<=3) return {zone:'REBEL',rebel:'+2 bonus credits',empire:null,rebelBonus:{credits:2},empireBonus:{}};
+  if(pos===4) return {zone:'NEUTRAL',rebel:'No effect',empire:'No effect',rebelBonus:{},empireBonus:{}};
+  if(pos<=6) return {zone:'EMPIRE',rebel:null,empire:'+2 bonus credits',rebelBonus:{},empireBonus:{credits:2}};
+  return {zone:'DEEP EMPIRE',rebel:'−1 card draw',empire:'+2 attack bonus',rebelBonus:{drawPenalty:1},empireBonus:{atkBonus:2}};
+}
+
+function applyForceEffects(){
+  const fx=getForceEffect(G.forcePos);
+  // Rebel bonuses
+  if(fx.rebelBonus.credits){G.player.credits+=fx.rebelBonus.credits;addLog(`⚡ Force [${fx.zone}]: You gain +${fx.rebelBonus.credits}₿`,'fl');}
+  if(fx.rebelBonus.draw){G.player.forceBonusDraw=(G.player.forceBonusDraw||0)+fx.rebelBonus.draw;addLog(`⚡ Force [${fx.zone}]: You draw +${fx.rebelBonus.draw} extra next turn`,'fl');}
+  if(fx.rebelBonus.drawPenalty){G.player.forceDrawPenalty=(G.player.forceDrawPenalty||0)+fx.rebelBonus.drawPenalty;addLog(`⚡ Force [${fx.zone}]: You draw −${fx.rebelBonus.drawPenalty} next turn`,'fl');}
+  if(fx.rebelBonus.atkPenalty){G.ai.forceAtkPenalty=(G.ai.forceAtkPenalty||0)+fx.rebelBonus.atkPenalty;addLog(`⚡ Force [${fx.zone}]: Empire attack −${fx.rebelBonus.atkPenalty} this turn`,'fl');}
+  // Empire bonuses
+  if(fx.empireBonus.credits){G.ai.credits+=fx.empireBonus.credits;addLog(`⚡ Force [${fx.zone}]: Empire gains +${fx.empireBonus.credits}₿`,'fl');}
+  if(fx.empireBonus.atkBonus){G.ai.forceAtkBonus=(G.ai.forceAtkBonus||0)+fx.empireBonus.atkBonus;addLog(`⚡ Force [${fx.zone}]: Empire gets +${fx.empireBonus.atkBonus} attack bonus`,'fl');}
+  if(fx.zone==='NEUTRAL') addLog(`⚡ Force [NEUTRAL]: No bonus — token holds center`,'fl');
+  updateStats();
+}
+
+function doForce(){
+  if(G.forcePlayed||G.gameOver)return;
+  G.forcePlayed=true;
+  const pf=G.player.force, af=G.ai.force;
+  const btn=document.getElementById('btn-force');
+  btn.disabled=true;
+  btn.classList.remove('ready');
+
+  let moved=false;
+  if(pf>af){
+    const steps=pf;
+    G.forcePos=Math.max(0,G.forcePos-steps);
+    addLog(`⚡ Force Struggle: Rebel ${pf}⚡ > Empire ${af}⚡ — token moves ${steps} toward REBEL side!`,'fl');
+    moved=true;
+  } else if(af>pf){
+    const steps=af;
+    G.forcePos=Math.min(G.forceTotal-1,G.forcePos+steps);
+    addLog(`⚡ Force Struggle: Empire ${af}⚡ > Rebel ${pf}⚡ — token moves ${steps} toward EMPIRE side!`,'fl');
+    moved=true;
+  } else {
+    addLog(`⚡ Force Struggle: Tied at ${pf}⚡ — token holds position`,'fl');
+  }
+
+  const fx=getForceEffect(G.forcePos);
+  applyForceEffects();
+  setMsg(`Force resolved [${fx.zone}]${fx.rebel?' · Rebel: '+fx.rebel:''}${fx.empire?' · Empire: '+fx.empire:''}`);
+  render();
+}
+
+function endTurn(){
+  if(G.turn!=='player'||G.gameOver)return;
+  cancelHit();
+  if(!G.forcePlayed)doForce();
+  // Only bombard if game not already over (e.g. from a HIT card this turn)
+  if(!G.gameOver&&G.player.attack>0)applyAttack(G.ai.bases,G.player.attack,'Empire',G.ai);
+  G.player.attack=0;
+  if(G.gameOver){render();return;}
+  // Discard
+  G.player.discard.push(...G.player.hand,...G.player.played);
+  G.player.hand=[];G.player.played=[];
+  G.player.credits=0;G.player.force=0;G.player.atkCards=0;
+  G.forcePlayed=false;
+  G.turn='ai';
+  setButtons(false);
+  const p=document.getElementById('tpill');
+  p.textContent='AI TURN';p.className='tpill tp-a';
+  setMsg('Empire is calculating…');
+  render();
+  setTimeout(runAI,900);
+}
+
+function applyAttack(bases,atk,label,who){
+  // Attack always targets the active base only
+  const t = who ? activeBase(who) : bases.filter(b=>!b.destroyed)[0];
+  if(!t)return;
+  const d=Math.min(atk,t.hp);
+  t.hp=Math.max(0,t.hp-d);
+  if(t.hp===0&&!t.destroyed){
+    t.destroyed=true;
+    addLog(`💥 ${t.name} [${label}] destroyed by bombardment!`,'hil');
+    checkWin();
+  } else {
+    addLog(`⚔ Bombardment hits ${t.name} for ${d} (${t.hp}/${t.maxHp} HP)`);
+  }
+}
+
+/* ══ AI TURN ══ */
+function setAIPhase(label){
+  const badge=document.getElementById('ai-phase-badge');
+  const lbl=document.getElementById('ai-hand-lbl');
+  const wrap=document.getElementById('ai-hand-wrap');
+  if(label){
+    badge.textContent=label; badge.style.display='inline-block';
+    lbl.textContent='EMPIRE PLAYS'; wrap.classList.add('ai-active');
+  } else {
+    badge.style.display='none';
+    lbl.textContent='EMPIRE HAND'; wrap.classList.remove('ai-active');
+  }
+}
+
+function renderAIPlayed(cards, dealingIdx=-1){
+  // Show all cards in G.ai.played face-up, with animation on the newest one
+  const ab=activeBase(G.ai);
+  const aiAtkBonus=ab?ab.atkBonus:0;
+  document.getElementById('ai-hand').innerHTML=
+    G.ai.played.map((c,i)=>{
+      const isHit=c.hit>0;
+      const fCls=cfCls(c.faction);
+      const hitCls=isHit?'ai-played-hit':'';
+      const dealCls=i===dealingIdx?'dealing':'';
+      const icons=[];
+      if(c.cr>0)icons.push(`<span class="ic ic-cr">+${c.cr}₿</span>`);
+      if(c.fo>0)icons.push(`<span class="ic ic-fo">+${c.fo}⚡</span>`);
+      const at=c.at+(c.at>0?aiAtkBonus:0);
+      if(at>0)icons.push(`<span class="ic ic-at">+${at}⚔</span>`);
+      if(isHit)icons.push(`<span class="ic ic-hit">HIT:${c.hit}</span>`);
+      if(c.sp==='draw1')icons.push(`<span class="ic ic-sp">Draw</span>`);
+      if(c.sp==='steal2')icons.push(`<span class="ic" style="background:rgba(255,61,90,.2);color:var(--hit);">Steal 2₿</span>`);
+      return`<div class="card ${fCls} ai-played ${hitCls} ${dealCls}" title="${c.name}">
+        <div class="ctop">
+          <div class="fdot" style="background:${dotCol(c.faction)}"></div>
+          ${c.cost>0?`<div class="cbadge">${c.cost}</div>`:''}
+        </div>
+        <div class="cname">${c.name}</div>
+        <div class="ctype">${c.type}</div>
+        <div class="cart" style="${artStyle(c.faction)}">${c.art||'?'}</div>
+        <div class="cicons">${icons.join('')}</div>
+      </div>`;
+    }).join('');
+}
+
+function runAI(){
+  if(G.gameOver)return;
+  G.ai.credits+=getPassiveCredits(G.ai);
+  const drawCount = G.aiFirstTurn ? 6 : 5;
+  G.aiFirstTurn = false;
+  drawCards(G.ai, drawCount);
+  addLog(`Empire draws ${drawCount} cards.`,'el');
+  setAIPhase('DRAWING');
+  setMsg('Empire is drawing cards…');
+
+  // Show face-down cards first briefly
+  document.getElementById('ai-hand').innerHTML=
+    G.ai.hand.map(()=>makeCard(null,{isBack:true})).join('');
+
+  const toPlay=[...G.ai.hand];
+  G.ai.hand=[];
+  const ab=activeBase(G.ai);
+  const aiAtkBonus=ab?ab.atkBonus:0;
+
+  // Reveal cards one by one with delay
+  let playIdx=0;
+  function revealNext(){
+    if(playIdx>=toPlay.length){
+      afterAllPlayed();
+      return;
+    }
+    const c=toPlay[playIdx];
+    G.ai.played.push(c);
+    G.ai.credits+=c.cr; G.ai.force+=c.fo;
+    // Hit cards deal damage directly — don't also add their attack to the bombardment pool
+    const at = c.hit>0 ? 0 : c.at+(c.at>0?aiAtkBonus:0);
+    G.ai.attack+=at;
+    if(at>0)G.ai.atkCards++;
+    if(c.sp==='draw1')drawCards(G.ai,1);
+    if(c.sp==='steal2'){G.player.credits=Math.max(0,G.player.credits-2);addLog("Vader's Force choke steals 2₿ from you!",'el');}
+    if(c.sp==='discard1'){if(G.player.hand.length>0){const ri=0|Math.random()*G.player.hand.length;const dc=G.player.hand.splice(ri,1)[0];G.player.discard.push(dc);addLog(`Imperial Spy forces you to discard ${dc.name}!`,'el');}}
+
+    const parts=[];
+    if(c.cr>0)parts.push(`+${c.cr}₿`);
+    if(c.fo>0)parts.push(`+${c.fo}⚡`);
+    if(at>0)parts.push(`+${at}⚔`);
+    if(c.hit>0)parts.push(`HIT:${c.hit} direct`);
+    addLog(`Empire plays ${c.name}${parts.length?' ['+parts.join(' ')+']':''}`, c.hit>0?'hil':'el');
+
+    setAIPhase(`PLAYING ${playIdx+1}/${toPlay.length}`);
+    setMsg(`Empire plays ${c.name}${c.hit>0?' — direct hit incoming!':at>0?' — building attack!':c.cr>0?' — generating credits.':''}`);
+    renderAIPlayed(G.ai.played, G.ai.played.length-1);
+    updateStats();
+    playIdx++;
+    setTimeout(revealNext, 480);
+  }
+
+  setTimeout(()=>{
+    setAIPhase('PLAYING');
+    revealNext();
+  }, 500);
+
+  function afterAllPlayed(){
+    if(HR.atkBonus&&G.ai.atkCards>=2){G.ai.attack+=2;addLog('Empire double attack bonus: +2⚔','el');}
+    addLog(`Empire played ${toPlay.length} cards total [${G.ai.credits}₿ ${G.ai.force}⚡ ${G.ai.attack}⚔]`,'el');
+    updateStats();
+
+    setTimeout(()=>{
+      // Hit cards — resolve one by one against player's ACTIVE base only
+      const hitCards=toPlay.filter(c=>c.hit>0);
+      let hi=0;
+      function resolveHit(){
+        if(G.gameOver){render();return;}
+        if(hi>=hitCards.length){afterHits();return;}
+        const c=hitCards[hi];
+        const t=activeBase(G.player); // only active base can be hit
+        if(t){
+          t.hp=Math.max(0,t.hp-c.hit);
+          if(t.hp===0&&!t.destroyed){
+            t.destroyed=true;
+            addLog(`💥 ${t.name} DESTROYED by Empire's ${c.name}!`,'hil');
+            setMsg(`💥 ${c.name} destroyed your ${t.name}!`);
+            renderArena('rebel'); updateStats();
+            checkWin();
+            if(G.gameOver){render();return;} // stop — no more hits this turn
+          } else {
+            addLog(`🎯 Empire's ${c.name} strikes ${t.name} for ${c.hit} dmg (${t.hp}/${t.maxHp} HP)`,'hil');
+            setMsg(`🎯 ${c.name} hits your active base ${t.name} for ${c.hit} damage!`);
+            renderArena('rebel'); updateStats();
+          }
+        }
+        hi++;
+        setTimeout(resolveHit, 500);
+      }
+      setAIPhase('STRIKING');
+      resolveHit();
+    }, 400);
+
+    function afterHits(){
+      if(G.gameOver)return;
+      setAIPhase('BUYING');
+      setMsg('Empire is acquiring new cards…');
+
+      // Buy
+      const sorted=[...G.galaxy.row].sort((a,b)=>(b.hit+b.at)-(a.hit+a.at)||b.cost-a.cost);
+      let tmp=G.ai.credits,bought=0;
+      sorted.forEach(c=>{
+        if(bought>=2)return;
+        let cost=effectiveCost(c,'empire');if(tmp>=cost){tmp-=cost;const gi=G.galaxy.row.findIndex(x=>x.uid===c.uid);if(gi!==-1){G.galaxy.row.splice(gi,1);G.ai.discard.push({...c,uid:uid()});drawGalaxy();G.ai.credits-=cost;addLog(`Empire acquires ${c.name} (${cost}₿)`,'el');bought++;}}
+      });
+
+      // Powerups
+      const puS=[...G.pu.row].sort((a,b)=>(a.type==='atk'?0:1)-(b.type==='atk'?0:1)||a.cost-b.cost);
+      puS.forEach(pu=>{
+        if(G.ai.credits<pu.cost)return;
+        const abAI=activeBase(G.ai);if(!abAI)return;
+        if(pu.type==='res'&&G.ai.passiveCredits>=4)return;
+        G.ai.credits-=pu.cost;
+        const idx=G.pu.row.findIndex(x=>x.uid===pu.uid);if(idx===-1)return;
+        G.pu.row.splice(idx,1);drawPowerup();
+        if(pu.type==='hp'){abAI.hp+=pu.amount;abAI.maxHp+=pu.amount;abAI.powerups.push({type:'hp',amount:pu.amount,name:pu.name});addLog(`Empire upgrades ${abAI.name}: +${pu.amount} HP`,'el');}
+        else if(pu.type==='atk'){abAI.atkBonus=Math.min(abAI.atkBonus+pu.amount,8);abAI.powerups.push({type:'atk',amount:pu.amount,name:pu.name});addLog(`Empire upgrades ${abAI.name}: +${pu.amount} attack bonus`,'el');}
+        else if(pu.type==='res'){const add=Math.min(pu.amount,4-G.ai.passiveCredits);G.ai.passiveCredits=Math.min(4,G.ai.passiveCredits+add);abAI.powerups.push({type:'res',amount:add,name:pu.name});addLog(`Empire sets passive +${add}₿/turn`,'el');}
+      });
+
+      render(); updateStats();
+
+      setTimeout(()=>{
+        setAIPhase('BOMBARDING');
+        // Apply force bonuses/penalties to accumulated attack
+        const forceAtkBonus=G.ai.forceAtkBonus||0;
+        const forceAtkPenalty=G.ai.forceAtkPenalty||0;
+        G.ai.forceAtkBonus=0; G.ai.forceAtkPenalty=0;
+        const totalAtk=Math.max(0, G.ai.attack+forceAtkBonus-forceAtkPenalty);
+        if(totalAtk>0){
+          setMsg(`Empire bombards with ${totalAtk} attack${forceAtkBonus?` (+${forceAtkBonus} Force)`:forceAtkPenalty?` (−${forceAtkPenalty} Force penalty)`:''}!`);
+          applyAttack(G.player.bases,totalAtk,'Rebel',G.player);
+        }
+        G.ai.attack=0;
+        if(G.gameOver){render();return;}
+
+        // Force
+        const pf=G.player.force,af=G.ai.force;
+        if(af>pf){G.forcePos=Math.min(G.forceTotal-1,G.forcePos+af);addLog(`⚡ Force: Empire ${af}⚡ > Rebel ${pf}⚡ — token moves ${af} toward Empire!`,'fl');}
+        else if(pf>af){G.forcePos=Math.max(0,G.forcePos-pf);addLog(`⚡ Force: Rebel ${pf}⚡ > Empire ${af}⚡ — token moves ${pf} toward Rebel!`,'fl');}
+        else addLog(`⚡ Force: Tied at ${af}⚡. Token holds.`,'fl');
+        applyForceEffects();
+
+        render(); updateStats();
+
+        setTimeout(()=>{
+          // End AI turn — keep played cards visible for a beat, then discard
+          setAIPhase('TURN ENDING');
+          setMsg('Empire turn ending — review what was played…');
+
+          setTimeout(()=>{
+            G.ai.discard.push(...G.ai.hand,...G.ai.played);
+            G.ai.hand=[];G.ai.played=[];
+            G.ai.credits=0;G.ai.force=0;G.ai.atkCards=0;
+            G.turn='player';G.round++;
+
+            document.getElementById('rnum').textContent=G.round;
+            const p=document.getElementById('tpill');p.textContent='YOUR TURN';p.className='tpill tp-p';
+            setAIPhase(null);
+            setButtons(true);
+
+            const pc=getPassiveCredits(G.player);
+            if(pc>0){addLog(`Passive income: +${pc}₿ from base upgrades`,'pul');G.player.credits+=pc;}
+
+            const drawPenalty=G.player.forceDrawPenalty||0;
+            const drawBonus=G.player.forceBonusDraw||0;
+            G.player.forceDrawPenalty=0; G.player.forceBonusDraw=0;
+            const actualDraw=Math.max(1, 5+drawBonus-drawPenalty);
+            drawCards(G.player, actualDraw);
+            addLog(`── Round ${G.round} · You drew ${G.player.hand.length} cards${drawBonus?` (+${drawBonus} Force bonus)`:''}${drawPenalty?` (−${drawPenalty} Force penalty)`:''} ──`,'hl');
+            setMsg('Your turn! Play cards · HIT cards target a base · Buy from Galaxy Row · Upgrade base');
+            render();updateStats();
+          }, 1200);
+        }, 600);
+      }, 500);
+    }
+  }
+}
+
+/* ══ WIN CHECK ══ */
+function checkWin(){
+  const pd=G.player.bases.filter(b=>b.destroyed).length;
+  const ad=G.ai.bases.filter(b=>b.destroyed).length;
+  if(ad>=winTarget)showWin('rebel');
+  else if(pd>=winTarget)showWin('empire');
+}
+
+/* ══ RENDERING ══ */
+function hpCls(b){const p=b.hp/b.maxHp;return p>0.6?'hhi':p>0.3?'hmd':'hlo';}
+function dotCol(f){return f==='rebel'?'var(--rebel)':f==='empire'?'var(--empire)':'var(--gold)';}
+function artStyle(f){return f==='rebel'?'background:linear-gradient(135deg,rgba(232,68,10,.12),rgba(232,68,10,.04))':f==='empire'?'background:linear-gradient(135deg,rgba(74,158,255,.12),rgba(74,158,255,.04))':'background:linear-gradient(135deg,rgba(245,200,66,.08),rgba(245,200,66,.02))';}
+function cfCls(f){return f==='rebel'?'rebel-card':f==='empire'?'empire-card':'neutral-card';}
+
+function renderArena(side){
+  const who=side==='rebel'?G.player:G.ai;
+  const faction=side;
+  const el=document.getElementById(side+'-arena');
+  const ab=activeBase(who);
+  const alive=who.bases.filter(b=>!b.destroyed);
+  const destroyed=who.bases.filter(b=>b.destroyed).length;
+  const isTargetable=side==='empire'&&pendingHit&&pendingHit.card;
+
+  // Queue dots (all 10 bases)
+  const qDots=who.bases.map(b=>{
+    const isActive=ab&&b.id===ab.id;
+    const cls=b.destroyed?'q-dot dead':`q-dot alive-${faction}${isActive?' ring':''}`;
+    const style=isActive?` style="outline:2px solid ${faction==='rebel'?'var(--rebel)':'var(--empire)'};outline-offset:1px;"` :'';
+    return `<div class="${cls}"${style} title="${b.name}: ${b.destroyed?'DESTROYED':b.hp+'/'+b.maxHp+' HP'}"></div>`;
+  }).join('');
+
+  // Powerup tags for active base
+  let puTags='';
+  if(ab&&ab.powerups.length>0){
+    puTags=ab.powerups.map(p=>{
+      const cls=p.type==='hp'?'pu-tag pu-hp-t':p.type==='atk'?'pu-tag pu-atk-t':'pu-tag pu-res-t';
+      const sym=p.type==='hp'?'🛡':p.type==='atk'?'⚔':'💰';
+      return `<span class="${cls}">${sym}+${p.amount}</span>`;
+    }).join('');
+  }
+
+  // Active base card
+  let bdHTML='';
+  if(!ab){
+    bdHTML=`<div class="bd-card ${faction}-bd destroyed-bd"><div class="bd-art">💀</div><div class="bd-name">ALL BASES LOST</div></div>`;
+  } else {
+    const pct=Math.round(ab.hp/ab.maxHp*100);
+    const tgtClick=isTargetable?`onclick="targetBase('${ab.id}')"` :'';
+    const tgtCls=isTargetable?'targetable':'';
+    bdHTML=`<div class="bd-card ${faction}-bd ${tgtCls}" ${tgtClick}>
+      <div class="bd-art">${ab.art}</div>
+      <div class="bd-name">${ab.name}</div>
+      <div class="bd-lore">${ab.lore}</div>
+      <div class="bd-hp-wrap">
+        <div class="bd-hp-nums">
+          <span class="bd-hp-label">HP</span>
+          <span class="bd-hp-val" style="color:${pct>60?'var(--hp-hi)':pct>30?'var(--hp-md)':'var(--hp-lo)'}">${ab.hp}/${ab.maxHp}</span>
+        </div>
+        <div class="bd-bar"><div class="bd-bar-fill ${hpCls(ab)}" style="width:${pct}%"></div></div>
+      </div>
+      ${puTags?`<div class="bd-powerups">${puTags}</div>`:''}
+      ${isTargetable?`<div style="text-align:center;font-size:10px;color:var(--hit);margin-top:2px;font-weight:700;">CLICK TO TARGET</div>`:''}
+    </div>
+    <div class="bd-nav">
+      <span class="bd-nav-lbl">${alive.length} alive · ${destroyed} destroyed</span>
+    </div>`;
+  }
+
+  // Side info
+  const sideName=faction==='rebel'
+    ?`<div class="side-name rebel-col">REBEL ALLIANCE</div>`
+    :`<div class="side-name empire-col">GALACTIC EMPIRE</div>`;
+
+  const statsHTML=faction==='rebel'
+    ?`<div class="side-stats">
+        <span class="sch sc-cr">₿ <span id="p-credits">0</span></span>
+        <span class="sch sc-fo">⚡ <span id="p-force">0</span></span>
+        <span class="sch sc-at">⚔ <span id="p-attack">0</span></span>
+      </div>
+      <div class="deck-row">Deck:<span id="p-deck">0</span> · Disc:<span id="p-disc">0</span></div>
+      ${G.player.passiveCredits>0?`<div style="font-size:9px;color:var(--pu-res);">+${G.player.passiveCredits}₿/turn passive</div>`:''}`
+    :`<div class="side-stats">
+        <span class="sch sc-cr">₿ <span id="ai-credits">0</span></span>
+        <span class="sch sc-fo">⚡ <span id="ai-force">0</span></span>
+        <span class="sch sc-at">⚔ <span id="ai-attack">0</span></span>
+      </div>
+      <div class="deck-row">Deck:<span id="ai-deck">0</span> · Disc:<span id="ai-disc">0</span></div>
+      ${G.ai.passiveCredits>0?`<div style="font-size:9px;color:var(--pu-res);">+${G.ai.passiveCredits}₿/turn passive</div>`:''}`;
+
+  // Assemble
+  if(faction==='rebel'){
+    el.innerHTML=`
+      <div class="side-col">
+        ${sideName}
+        <div class="side-score" id="rebel-score"></div>
+        ${statsHTML}
+        <div class="queue-row">${qDots}<span class="q-lbl" style="margin-left:3px;">base queue</span></div>
+      </div>
+      <div class="base-display">${bdHTML}</div>
+      <div></div>`;
+  } else {
+    el.innerHTML=`
+      <div></div>
+      <div class="base-display">${bdHTML}</div>
+      <div class="side-col" style="align-items:flex-end;text-align:right;">
+        ${sideName}
+        <div class="side-score" id="empire-score"></div>
+        ${statsHTML}
+        <div class="queue-row" style="justify-content:flex-end;">${qDots}<span class="q-lbl" style="margin-left:3px;">base queue</span></div>
+      </div>`;
+  }
+  // scores
+  const rScoreEl=document.getElementById('rebel-score');
+  const eScoreEl=document.getElementById('empire-score');
+  if(rScoreEl)rScoreEl.textContent=`${G.player.bases.filter(b=>!b.destroyed).length} bases remaining · ${G.player.bases.filter(b=>b.destroyed).length} destroyed`;
+  if(eScoreEl)eScoreEl.textContent=`${G.ai.bases.filter(b=>!b.destroyed).length} bases remaining · ${G.ai.bases.filter(b=>b.destroyed).length} destroyed`;
+}
+
+function renderForce(){
+  // rendered inside vs-col
+  const cells=Array.from({length:G.forceTotal},(_,i)=>{
+    let cls=i<Math.floor(G.forceTotal/2)?'fvc rz':i>Math.floor(G.forceTotal/2)?'fvc ez':'fvc cz';
+    if(i===G.forcePos)cls+=' tok';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+  const el=document.getElementById('force-cells');
+  if(el)el.innerHTML=cells;
+}
+
+function makeCard(card,opts={}){
+  const{playable=false,played=false,buyable=false,isBack=false,isPU=false,onclick='',showHit=true,costOverride=null,costLabel=null}=opts;
+  if(isBack)return`<div class="card back-card"><div style="height:100%;display:flex;align-items:center;justify-content:center;color:rgba(74,158,255,.22);font-size:22px;">🌀</div></div>`;
+
+  if(isPU){
+    const stripeCls=card.type==='hp'?'pu-hp-s':card.type==='atk'?'pu-atk-s':'pu-res-s';
+    const canBuy=buyable;
+    return`<div class="card neutral-card${canBuy?' pu-card':''}" onclick="${onclick}" title="${card.desc}">
+      <div class="pu-stripe ${stripeCls}"></div>
+      <div class="ctop" style="margin-top:4px;">
+        <div class="fdot" style="background:var(--pu-res)"></div>
+        <div class="cbadge" style="background:rgba(167,139,250,.18);border-color:var(--pu-res);color:var(--pu-res);">${card.cost}</div>
+      </div>
+      <div class="cname">${card.name}</div>
+      <div class="ctype">BASE UPGRADE</div>
+      <div class="cart" style="background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(167,139,250,.03))">${card.art}</div>
+      <div class="cicons"><span class="ic ic-pu">${card.type==='hp'?'🛡+HP':card.type==='atk'?'⚔+ATK':'💰+RES'} ${card.amount}</span></div>
+    </div>`;
+  }
+
+  const displayCost = costOverride !== null ? costOverride : card.cost;
+  const isDiscounted = costOverride !== null && costOverride < card.cost;
+  const isTaxed = costOverride !== null && costOverride > card.cost;
+  const isHit=card.hit>0;
+  const cls=['card',cfCls(card.faction),playable?'playable':'',played?'played':'',buyable?'buyable':'',isHit&&!played?'has-hit':''].filter(Boolean).join(' ');
+  const icons=[];
+  if(card.cr>0)icons.push(`<span class="ic ic-cr">+${card.cr}₿</span>`);
+  if(card.fo>0)icons.push(`<span class="ic ic-fo">+${card.fo}⚡</span>`);
+  if(card.at>0)icons.push(`<span class="ic ic-at">+${card.at}⚔</span>`);
+  if(card.hit>0&&showHit)icons.push(`<span class="ic ic-hit">HIT:${card.hit}</span>`);
+  if(card.sp==='draw1')icons.push(`<span class="ic ic-sp">Draw</span>`);
+  const badgeStyle = isDiscounted
+    ? 'border-color:#4ade80;color:#4ade80;background:rgba(74,222,128,.15);'
+    : isTaxed
+    ? 'border-color:#f87171;color:#f87171;background:rgba(248,113,113,.15);'
+    : '';
+  const costBadge = displayCost>0
+    ? `<div class="cbadge" title="${isDiscounted?'Faction discount: −1₿':isTaxed?'Opposite faction tax: +1₿':''}" style="${badgeStyle}">${displayCost}${isDiscounted?`<span style="text-decoration:line-through;font-size:7px;opacity:.5;margin-left:1px;">${card.cost}</span>`:isTaxed?`<span style="text-decoration:line-through;font-size:7px;opacity:.5;margin-left:1px;">${card.cost}</span>`:''}</div>`
+    : '';
+  const hoverTitle=`${card.name}${card.hit?' · Deals '+card.hit+' direct base damage':''}${isDiscounted?' · Faction discount: −1₿':isTaxed?' · Opposite faction tax: +1₿':''}`;
+  return`<div class="${cls}" onclick="${onclick}" title="${hoverTitle}">
+    <div class="ctop">
+      <div class="fdot" style="background:${dotCol(card.faction)}"></div>
+      ${costBadge}
+    </div>
+    <div class="cname">${card.name}</div>
+    <div class="ctype">${card.type}</div>
+    <div class="cart" style="${artStyle(card.faction)}">${card.art||'?'}</div>
+    <div class="cicons">${icons.join('')}</div>
+  </div>`;
+}
+
+function updateStats(){
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('p-credits',G.player.credits);set('p-force',G.player.force);set('p-attack',G.player.attack);
+  set('p-deck',G.player.deck.length);set('p-disc',G.player.discard.length);
+  set('ai-credits',G.ai.credits);set('ai-force',G.ai.force);set('ai-attack',G.ai.attack);
+  set('ai-deck',G.ai.deck.length);set('ai-disc',G.ai.discard.length);
+  updateForceCounts();
+}
+
+function render(){
+  renderArena('empire');
+  renderArena('rebel');
+  // Force track — embed a mini vertical one in a vs divider we'll render inline... 
+  // Actually force is shown inside arenas via renderArena, but we still need the force cells
+  // Insert the vs divider with force track between arenas dynamically
+  renderVS();
+  updateStats();
+
+  // AI hand — show backs during player turn, face-up played cards during AI turn
+  if(G.turn==='ai'){
+    // renderAIPlayed is called directly during AI turn; render() called during player turn clears it
+  } else {
+    document.getElementById('ai-hand').innerHTML=
+      G.ai.hand.map(()=>makeCard(null,{isBack:true})).join('')+
+      G.ai.played.map(c=>makeCard(c,{played:true,showHit:false})).join('');
+  }
+
+  // Player hand
+  document.getElementById('p-hand').innerHTML=
+    G.player.hand.map(c=>{
+      const played=G.player.played.some(p=>p.uid===c.uid);
+      const canPlay=G.turn==='player'&&!played&&!G.gameOver;
+      return makeCard(c,{playable:canPlay,played,onclick:`playCard('${c.uid}')`});
+    }).join('')+
+    G.player.played.map(c=>makeCard(c,{played:true})).join('');
+
+  // Galaxy row
+  document.getElementById('galaxy-row').innerHTML=
+    G.galaxy.row.map(c=>{
+      const cost=effectiveCost(c,'rebel');
+      const canBuy=G.turn==='player'&&G.player.credits>=cost&&!pendingHit&&!G.gameOver;
+      const costLabel=cost!==c.cost?cost:null;
+      return makeCard(c,{buyable:canBuy,onclick:`buyCard('${c.uid}')`,costOverride:cost,costLabel});
+    }).join('');
+
+  // Powerup row
+  document.getElementById('powerup-row').innerHTML=
+    G.pu.row.map(p=>{
+      let canBuy=G.turn==='player'&&G.player.credits>=p.cost&&!pendingHit&&!G.gameOver;
+      if(p.type==='res'&&G.player.passiveCredits>=4)canBuy=false;
+      return makeCard(p,{isPU:true,buyable:canBuy,onclick:`buyPowerup('${p.uid}')`});
+    }).join('');
+}
+
+function renderVS(){
+  const ft=document.getElementById('force-cells');
+  if(ft){
+    ft.innerHTML=Array.from({length:G.forceTotal},(_,i)=>{
+      let cls=i<Math.floor(G.forceTotal/2)?'fvc rz':i>Math.floor(G.forceTotal/2)?'fvc ez':'fvc cz';
+      if(i===G.forcePos)cls+=' tok';
+      return`<div class="${cls}"></div>`;
+    }).join('');
+  }
+  const zl=document.getElementById('force-zone-label');
+  if(zl){
+    const fx=getForceEffect(G.forcePos);
+    const col=G.forcePos<=3?'var(--rebel)':G.forcePos>=5?'var(--empire)':'var(--muted)';
+    zl.style.color=col;
+    zl.textContent=`FORCE: ${fx.zone}${fx.rebel?' · You: '+fx.rebel:''}${fx.empire?' · Empire: '+fx.empire:''}`;
+  }
+}
+
+/* ══ UI ══ */
+function addLog(msg,cls=''){
+  if(!G.log)return;
+  G.log.unshift({msg,cls});
+  if(G.log.length>60)G.log.pop();
+  document.getElementById('logwrap').innerHTML=G.log.map(l=>`<div class="le ${l.cls}">${l.msg}</div>`).join('');
+}
+function setMsg(m){document.getElementById('msgbox').textContent=m;}
+function setButtons(playerTurn){
+  const btnEnd=document.getElementById('btn-end');
+  const btnForce=document.getElementById('btn-force');
+  btnEnd.disabled=!playerTurn;
+  if(playerTurn&&!G.forcePlayed){
+    btnForce.disabled=false;
+    btnForce.classList.add('ready');
+  } else {
+    btnForce.disabled=true;
+    btnForce.classList.remove('ready');
+  }
+  updateForceCounts();
+}
+
+function updateForceCounts(){
+  const el=document.getElementById('force-counts');
+  if(!el)return;
+  if(G.turn==='player'&&!G.forcePlayed){
+    el.textContent=`(You ${G.player.force}⚡ vs AI ${G.ai.force}⚡)`;
+  } else {
+    el.textContent='';
+  }
+}
+
+function showWin(winner){
+  G.gameOver=true;
+  const ov=document.getElementById('ov');
+  const isP=winner==='rebel';
+  const pd=G.player.bases.filter(b=>b.destroyed).length;
+  const ad=G.ai.bases.filter(b=>b.destroyed).length;
+  ov.innerHTML=`<div class="ovbox">
+    <h2 class="${isP?'wr':'we'}">${isP?'⚡ REBEL VICTORY!':'💀 EMPIRE WINS!'}</h2>
+    <p>${isP?'The Rebellion triumphs! The galaxy is free.':'The Emperor\'s power is absolute. Resistance is futile.'}</p>
+    <p>Round ${G.round} · Your bases destroyed: ${pd}/10 · Enemy bases destroyed: ${ad}/10</p>
+    <p style="font-size:11px;color:var(--muted);">Victory condition: first to destroy ${winTarget} enemy bases.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:1.2rem;flex-wrap:wrap;">
+      <button class="btn b-end" onclick="startGame(${winTarget})" style="font-size:13px;padding:9px 24px;">Play Again (${winTarget} bases)</button>
+      <button class="btn b-ghost" onclick="showStartScreen()" style="font-size:13px;padding:9px 24px;">Change Mode</button>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+function hideOv(){document.getElementById('ov').style.display='none';}
+
+function showRules(){
+  const ov=document.getElementById('ov');
+  ov.innerHTML=`<div class="ovbox" style="max-width:540px;text-align:left;">
+    <h2 style="font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:3px;color:var(--gold);margin-bottom:1rem;">HOW TO PLAY</h2>
+    <p><strong style="color:var(--text)">Goal:</strong> Destroy <strong style="color:var(--hit)">3 enemy bases</strong> before they destroy 3 of yours. Each side has 10 bases shown one at a time in random order.</p>
+    <p><strong style="color:var(--text)">Turn order:</strong> Rebels go first (draw 5 cards). Empire goes second (draws 6 cards).</p>
+    <p><strong style="color:var(--text)">Playing cards:</strong> Click hand cards to play them. Cards give Credits (₿), Force (⚡), or Attack (⚔).</p>
+    <p><strong style="color:var(--hit)">HIT cards (red border):</strong> Deal direct damage to the <u>active enemy base only</u>. Click the glowing base card to confirm the strike.</p>
+    <p><strong style="color:var(--text)">Attack ⚔:</strong> Pooled attack hits the active enemy base at end of turn.</p>
+    <p><strong style="color:var(--pu-hp)">✦ Base Powerups (purple row):</strong></p>
+    <p style="padding-left:1rem;">🛡 <strong style="color:var(--pu-hp)">HP Boost</strong> — adds permanent HP to your active base.<br>
+    ⚔ <strong style="color:var(--pu-atk)">Attack Boost</strong> — attack cards played at this base deal bonus damage.<br>
+    💰 <strong style="color:var(--pu-res)">Resource Boost</strong> — grants passive +₿ per turn (max 4 total).</p>
+    <p><strong style="color:var(--force)">⚡ Force Struggle:</strong> Play Force cards to build your ⚡ total, then press the <strong>Force Struggle</strong> button (it pulses purple when ready). Whoever has more ⚡ moves the token one step toward their side. The token's zone determines the bonus applied immediately:</p>
+    <p style="padding-left:1rem;font-size:11px;">
+      <span style="color:var(--rebel)">Deep Rebel (far left):</span> You draw +1 card · Empire −1 attack<br>
+      <span style="color:rgba(232,68,10,.8)">Rebel zone:</span> You gain +2₿ credits<br>
+      <span style="color:var(--muted)">Neutral (center):</span> No effect<br>
+      <span style="color:rgba(74,158,255,.8)">Empire zone:</span> Empire gains +2₿ credits<br>
+      <span style="color:var(--empire)">Deep Empire (far right):</span> Empire +2 attack · You draw −1 card
+    </p>
+    <p style="color:var(--gold);font-size:11px;">🏠 House rules: Faction discount (−1₿ own faction), Double Attack (+2⚔ on 2nd attack card). Optional: Opposite faction tax (+1₿ for enemy faction cards).</p>
+    <button class="btn b-ghost" onclick="hideOv()" style="margin-top:1rem;">Close</button>
+  </div>`;
+  ov.style.display='flex';
+}
+
+let winTarget=3; // default, overwritten by start screen
+
+function showStartScreen(){
+  const ov=document.getElementById('ov');
+  ov.innerHTML=`<div class="ovbox" style="max-width:480px;">
+    <div style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--muted);margin-bottom:.4rem;">A LONG TIME AGO IN A GALAXY FAR, FAR AWAY...</div>
+    <h2 style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;margin-bottom:.3rem;
+      background:linear-gradient(90deg,var(--empire),var(--force),var(--rebel));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+      STAR WARS: DECKBUILDER</h2>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:1.4rem;">The Rebel Alliance faces the Galactic Empire in a battle for the galaxy. Choose how many bases must fall to end the war.</p>
+    <div style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:var(--gold);margin-bottom:.8rem;">SELECT VICTORY CONDITION</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1.4rem;">
+      <button class="btn b-ghost vc-btn" onclick="startGame(3)" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;color:var(--rebel);">3</span>
+        <span style="font-size:10px;color:var(--text);">Bases Destroyed</span>
+        <span style="font-size:9px;color:var(--muted);">Quick Battle (~15 min)</span>
+      </button>
+      <button class="btn b-ghost vc-btn" onclick="startGame(5)" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;color:var(--gold);">5</span>
+        <span style="font-size:10px;color:var(--text);">Bases Destroyed</span>
+        <span style="font-size:9px;color:var(--muted);">Standard (~25 min)</span>
+      </button>
+      <button class="btn b-ghost vc-btn" onclick="startGame(7)" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;color:var(--empire);">7</span>
+        <span style="font-size:10px;color:var(--text);">Bases Destroyed</span>
+        <span style="font-size:9px;color:var(--muted);">Epic Campaign (~40 min)</span>
+      </button>
+      <button class="btn b-ghost vc-btn" onclick="startGame(10)" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;color:var(--force);">10</span>
+        <span style="font-size:10px;color:var(--text);">Bases Destroyed</span>
+        <span style="font-size:9px;color:var(--muted);">Total War (~60 min)</span>
+      </button>
+    </div>
+    <p style="font-size:10px;color:var(--muted);">First side to destroy the target number of enemy bases wins. Rebels go first.</p>
+    <div style="margin-top:1rem;padding:10px 14px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;text-align:left;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:8px;">⚙ HOUSE RULES</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:11px;color:var(--text);">
+        <input type="checkbox" id="hr-tax" onchange="HR.factionTax=this.checked" style="width:14px;height:14px;cursor:pointer;accent-color:var(--gold);">
+        <span>Opposite faction cards cost <strong style="color:var(--gold)">+1₿</strong> more (Empire cards taxed for Rebels, Rebel cards taxed for Empire)</span>
+      </label>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+
+function startGame(target){
+  winTarget=target;
+  // Update the title bar goal label
+  const el=document.getElementById('win-goal-lbl');
+  if(el) el.textContent=`DESTROY ${winTarget} ENEMY BASES TO WIN`;
+  newGame();
+}
+
+/* ── Patch: insert force track between arenas ── */
+function injectForceSeparator(){
+  const g=document.getElementById('g');
+  if(document.getElementById('force-sep'))return;
+  const sep=document.createElement('div');
+  sep.id='force-sep';
+  sep.style.cssText='display:flex;flex-direction:column;gap:3px;padding:5px 10px;background:rgba(10,16,32,.8);border:0.5px solid rgba(200,160,255,.2);border-radius:8px;';
+  sep.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:9px;color:var(--rebel);letter-spacing:1px;">REBEL ◀</span>
+      <div id="force-cells" style="display:flex;gap:3px;flex:1;"></div>
+      <span style="font-size:9px;color:var(--empire);letter-spacing:1px;">▶ EMPIRE</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:8px;padding:0 2px;">
+      <span style="color:var(--rebel);opacity:.8;">+1 draw · AI−1atk</span>
+      <span style="color:rgba(232,68,10,.6);">+2₿</span>
+      <span style="color:var(--muted);">neutral</span>
+      <span style="color:rgba(74,158,255,.6);">+2₿</span>
+      <span style="color:var(--empire);opacity:.8;">+2atk · −1 draw</span>
+    </div>
+    <div style="text-align:center;font-size:9px;color:var(--force);font-weight:600;letter-spacing:1px;" id="force-zone-label">FORCE NEUTRAL</div>`;
+  const aiHand=document.getElementById('ai-hand').parentElement;
+  g.insertBefore(sep,aiHand);
+}
+
+injectForceSeparator();
+showStartScreen();
+</script>
+</body>
+</html>
